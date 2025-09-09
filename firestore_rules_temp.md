@@ -1,0 +1,81 @@
+# Regole Firestore per Giro Libero
+
+**IMPORTANTE: Devi copiare queste regole nella console Firebase del tuo progetto**
+
+1. Vai su https://console.firebase.google.com
+2. Seleziona il tuo progetto "Giro Libero"
+3. Vai su "Firestore Database" nel menu laterale
+4. Clicca sulla tab "Rules" 
+5. Sostituisci il contenuto esistente con il seguente:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Regole per gli utenti
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
+    }
+    
+    // Regole per le location fitness
+    match /fitness_locations/{locationId} {
+      allow read: if true; // Tutti possono leggere le location approvate
+      allow create: if request.auth != null; // Gli utenti autenticati possono creare
+      allow update: if request.auth != null && 
+        (request.auth.uid == resource.data.submittedBy || 
+         isAdmin(request.auth.uid)); // Solo chi ha creato o admin possono modificare
+    }
+    
+    // Regole per i suggerimenti di location
+    match /location_suggestions/{suggestionId} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == resource.data.submittedBy || 
+         isAdmin(request.auth.uid)); // Solo chi ha suggerito o admin possono leggere
+      allow create: if request.auth != null; // Gli utenti autenticati possono suggerire
+      allow update: if request.auth != null && isAdmin(request.auth.uid); // Solo admin possono approvare/rifiutare
+    }
+    
+    // Regole per le recensioni
+    match /reviews/{reviewId} {
+      allow read: if true; // Tutti possono leggere le recensioni approvate
+      allow create: if request.auth != null; // Gli utenti autenticati possono recensire
+      allow update: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || 
+         isAdmin(request.auth.uid)); // Solo l'autore o admin possono modificare
+    }
+    
+    // Regole per gli allenamenti
+    match /workouts/{workoutId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId; // Solo il proprietario può leggere
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId; // Solo il proprietario può creare
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId; // Solo il proprietario può modificare
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId; // Solo il proprietario può eliminare
+    }
+    
+    // Funzione helper per controllare se l'utente è admin
+    function isAdmin(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) &&
+             get(/databases/$(database)/documents/users/$(userId)).data.isAdmin == true;
+    }
+  }
+}
+```
+
+6. Clicca "Publish" per salvare le regole
+
+**Alternativa Temporanea per il Testing:**
+Se vuoi testare velocemente, puoi usare regole aperte (NON per produzione):
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+Dopo aver aggiornato le regole, l'app dovrebbe funzionare senza errori di permessi.
